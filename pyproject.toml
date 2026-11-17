@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deadpan"
+version = "0.1.0"
+description = "A pixelated, deadpan floating-head front end for LLM chat (Claude, OpenAI-compatible, Ollama)."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "kivy>=2.3,<2.4",
+    "certifi",
+]
+
+[project.optional-dependencies]
+claude = ["anthropic>=2.10"]
+dev = ["pytest", "anthropic>=2.10", "pyinstaller"]
+
+[project.scripts]
+deadpan = "deadpan.app:run"
+
+[tool.setuptools]
+packages = ["deadpan"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
