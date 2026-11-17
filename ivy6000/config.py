@@ -36,6 +36,8 @@ class Settings:
     use_fallbacks: bool = True
     skin: str = "dot"
     voice_enabled: bool = True
+    # "auto": natural neural voice (Piper) if installed, else the system voice.
+    voice_engine: str = "auto"
     # Exact voice name to use instead of the skin's preference (e.g. "Daniel", "en-gb+m3").
     voice_name: str = ""
     history_limit: int = 20

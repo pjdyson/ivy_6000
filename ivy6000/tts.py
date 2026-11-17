@@ -1,4 +1,7 @@
-"""Text-to-speech. Picks whatever the machine has, best first:
+"""Text-to-speech.
+
+The most human-sounding option is a Piper neural voice (see ``neural.py``), used when the
+``piper-tts`` package is installed. Otherwise it picks whatever the machine has:
 
 * macOS:   the built-in ``say`` command (British voices: Daniel, Arthur, Kate, ...)
 * Windows: ``pyttsx3`` if installed, otherwise Windows' own speech engine driven through
@@ -273,7 +276,27 @@ def voice_help() -> str:
     return "No speech engine found. Install one with: sudo apt install espeak-ng (then restart)."
 
 
-def make_speaker(voice: VoiceStyle, override: str = "") -> Speaker:
+def _is_piper_id(name: str) -> bool:
+    return bool(re.match(r"^[a-z]{2,3}_[A-Z]{2}-[\w]+-(x_low|low|medium|high)(:\w+)?$", name))
+
+
+def make_speaker(voice: VoiceStyle, override: str = "", engine: str = "auto",
+                 voices_dir=None, on_status=None) -> Speaker:
+    """engine: 'auto' (neural if installed, else system), 'neural' or 'system'."""
+    if engine in ("auto", "neural") and voices_dir is not None:
+        from . import neural
+
+        if neural.available():
+            model, speaker = voice.piper, voice.piper_speaker
+            if override and _is_piper_id(override):
+                model, _, speaker = override.partition(":")
+            sp = neural.PiperSpeaker(model, speaker, voice.piper_speed, voices_dir, on_status)
+            if sp.available:
+                return sp
+    return system_speaker(voice, "" if _is_piper_id(override) else override)
+
+
+def system_speaker(voice: VoiceStyle, override: str = "") -> Speaker:
     try:
         from kivy.utils import platform as kplatform
     except ImportError:
@@ -310,6 +333,8 @@ def _pyttsx3_or_silent(voice: VoiceStyle, override: str = "") -> Speaker:
 
 def fallback(failed: Speaker, voice: VoiceStyle, override: str = "") -> Speaker:
     """The next engine to try after ``failed`` raised an error."""
+    if failed.name.startswith("piper"):
+        return system_speaker(voice, "" if _is_piper_id(override) else override)
     if isinstance(failed, WindowsSpeaker):
         return _pyttsx3_or_silent(voice, override)
     return Speaker()

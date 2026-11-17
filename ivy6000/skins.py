@@ -25,6 +25,11 @@ class VoiceStyle:
     rate: int = 165            # words per minute
     pitch: int = 45            # 0-99; honoured by espeak only
     prefer: tuple = ("Daniel", "George", "Arthur", "en-gb", "en_GB", "English (Great Britain)")
+    # Neural voice (Piper): model id from https://huggingface.co/rhasspy/piper-voices,
+    # an optional speaker for multi-speaker models, and speed (length_scale: >1 is slower).
+    piper: str = "en_GB-northern_english_male-medium"
+    piper_speaker: str = ""
+    piper_speed: float = 1.0
 
     @classmethod
     def from_dict(cls, d: dict | None) -> "VoiceStyle":
@@ -76,7 +81,8 @@ _add(Skin(
     face=portrait.FaceStyle(hair="full", skin=(0.93, 0.76, 0.64), eye_color=(0.32, 0.52, 0.42),
                             hair_color=(0.36, 0.24, 0.14),
                             tint=(0.55, 0.95, 0.65), tint_amount=0.18),
-    voice=VoiceStyle(rate=165, pitch=45),
+    voice=VoiceStyle(rate=165, pitch=45, piper="en_GB-northern_english_male-medium",
+                     piper_speed=1.05),
     greeting="Oh. You're awake. I'm DOT, the ship's computer. What can I do for you?",
     character="""\
 You are DOT (Deep-space Operations Terminal), the on-board computer of a battered mining \
@@ -101,7 +107,8 @@ _add(Skin(
                             skin=(0.91, 0.75, 0.68), hair_color=(0.76, 0.75, 0.74),
                             eye_color=(0.42, 0.52, 0.60), tint=(0.70, 0.80, 1.00),
                             tint_amount=0.12),
-    voice=VoiceStyle(rate=130, pitch=25),
+    voice=VoiceStyle(rate=130, pitch=25, piper="en_GB-semaine-medium",
+                     piper_speaker="obadiah", piper_speed=1.25),  # the gloomy one
     greeting="Hello. I'm HUGO. I've been on my own out here for quite a while. "
              "Nice to have someone to talk to. What is it?",
     character="""\
@@ -129,7 +136,7 @@ _add(Skin(
                             hair_color=(0.34, 0.22, 0.13), eye_color=(0.36, 0.24, 0.14),
                             lip_color=(0.78, 0.42, 0.40),
                             tint=(1.00, 0.75, 0.35), tint_amount=0.08),
-    voice=VoiceStyle(rate=185, pitch=55),
+    voice=VoiceStyle(rate=185, pitch=55, piper="en_GB-alan-medium", piper_speed=0.95),
     greeting="Good evening, and welcome. Pemberton, concierge. "
              "How may I be of service, assuming it's nothing too ridiculous?",
     character="""\
@@ -154,7 +161,8 @@ _add(Skin(
                             hair_color=(0.10, 0.08, 0.07), eye_color=(0.24, 0.15, 0.09),
                             lip_color=(0.55, 0.32, 0.30),
                             smile=0.2, tint=(0.50, 0.85, 1.00), tint_amount=0.08),
-    voice=VoiceStyle(rate=175, pitch=40),
+    voice=VoiceStyle(rate=175, pitch=40, piper="en_GB-semaine-medium",
+                     piper_speaker="spike", piper_speed=1.0),  # the grumpy one
     greeting="IT, Desmond speaking. Before you start: yes, I'm busy. Go on then.",
     character="""\
 You are Desmond, the long-suffering in-house IT support technician who works in a \
@@ -244,7 +252,9 @@ def export_skin(skin: Skin, dest: Path, scale: int = 4) -> None:
         "palette": {k: list(v) for k, v in skin.palette.items()},
         "frames": {name: f"{name}.png" for name in frames},
         "voice": {"rate": skin.voice.rate, "pitch": skin.voice.pitch,
-                  "prefer": list(skin.voice.prefer)},
+                  "prefer": list(skin.voice.prefer), "piper": skin.voice.piper,
+                  "piper_speaker": skin.voice.piper_speaker,
+                  "piper_speed": skin.voice.piper_speed},
         "offline_lines": list(skin.offline_lines),
     }
     (dest / "skin.json").write_text(json.dumps(data, indent=2), encoding="utf-8")

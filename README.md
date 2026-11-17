@@ -74,22 +74,35 @@ directory. It appears under *Character* in settings.
 
 ## Voice
 
-Speech uses whatever the computer already has; no cloud service is needed.
+Each character has its own natural-sounding British voice, made with
+[Piper](https://github.com/OHF-Voice/piper1-gpl) neural text-to-speech. It runs entirely on your
+machine, so it's private, free and works offline once a voice is downloaded.
 
-- **macOS**: the built-in `say` command. Skins prefer British voices (Daniel, then Arthur). Add
-  more under System Settings → Accessibility → Spoken Content → System voice → Manage voices.
-- **Windows**: Windows' own speech engine, driven through PowerShell (nothing to install;
-  `pyttsx3` is used as a backup). For a British male voice, add *English (United Kingdom)*
-  under Settings → Time & language → Speech, then pick *George* via *Voice name override*.
-- **Linux**: `espeak-ng` if installed (`sudo apt install espeak-ng`; pitch works here, try a
-  voice override like `en-gb+m3`), otherwise the desktop's speech dispatcher (`spd-say`).
+| Character | Piper voice | Delivery |
+| :-------- | :---------- | :------- |
+| DOT | `en_GB-northern_english_male-medium` | dry, slightly unhurried |
+| HUGO | `en_GB-semaine-medium`, speaker `obadiah` (the gloomy one) | slow |
+| MR PEMBERTON | `en_GB-alan-medium` | a touch brisk |
+| DESMOND | `en_GB-semaine-medium`, speaker `spike` (the grumpy one) | normal |
 
-The status under the top bar shows which engine is in use. If it says **no voice**, the app
+Each voice (about 60 MB) downloads the first time that character speaks, into the app's
+`voices` folder. To try another, type a Piper voice in *Voice override* in settings, e.g.
+`en_GB-semaine-medium:poppy`, `en_GB-cori-high` or `en_GB-vctk-medium:p231`. Browse them all at
+https://rhasspy.github.io/piper-samples/. A skin can set its own with `piper`,
+`piper_speaker` and `piper_speed` (above 1 is slower) in its `voice` section.
+
+Audio is played with `winsound` on Windows, `afplay` on macOS, and `pw-play`, `paplay` or
+`aplay` on Linux (one of these is on almost every desktop).
+
+If Piper isn't available, or *Voice engine* is set to *System voice*, it falls back to the
+computer's own robotic-but-dependable voice:
+
+- **macOS**: `say` (prefers British voices: Daniel, Arthur).
+- **Windows**: Windows' own speech engine via PowerShell, with `pyttsx3` as a backup.
+- **Linux**: `espeak-ng` (`sudo apt install espeak-ng`), else the speech dispatcher (`spd-say`).
+
+The status under the top bar shows which voice is in use. If it says **no voice**, the app
 also writes what to install into the chat log.
-
-Each sentence is spoken in turn, with the subtitle and mouth kept in step. Code blocks and
-links aren't read out ("I've put the code in the log"). To force a particular voice, type its
-name in *Voice name override*.
 
 ## Model providers
 
@@ -158,7 +171,8 @@ ivy6000/portrait.py  shaded colour face renderer (no Kivy)
 ivy6000/sprites.py   UI colour schemes, PNG writer
 ivy6000/skins.py     built-in characters, user-skin loading, `export` command
 ivy6000/persona.py   shared ground rules for every character
-ivy6000/tts.py       speech: say / espeak / pyttsx3 / plyer
+ivy6000/tts.py       speech engine selection; system voices (say / espeak / Windows / plyer)
+ivy6000/neural.py    Piper neural voices: download, synthesis, playback
 ivy6000/llm.py       model backends (stdlib only; anthropic SDK optional)
 ivy6000/config.py    settings and JSON persistence
 ```

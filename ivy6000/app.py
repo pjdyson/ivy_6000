@@ -89,16 +89,18 @@ class Performer(threading.Thread):
                 Clock.schedule_once(lambda *_, l=line: self.on_line(l))
                 spoken = False
                 while self.voice_on and self.speaker.available and job == self.current:
+                    sp = self.speaker
                     try:
-                        self.speaker.speak(line)
+                        sp.speak(line)
                         spoken = True
                         break
                     except Exception as e:  # a broken voice shouldn't stop the show
                         if job != self.current or not self.voice_on:
                             break  # we interrupted it ourselves
-                        failed = self.speaker
-                        self.speaker = tts.fallback(failed, self.voice_style, self.voice_override)
-                        msg = f"{failed.name} failed ({e}); trying {self.speaker.name}."
+                        if self.speaker is not sp:
+                            continue  # already replaced (e.g. a failed voice download)
+                        self.speaker = tts.fallback(sp, self.voice_style, self.voice_override)
+                        msg = f"{sp.name} failed ({e}); trying {self.speaker.name}."
                         print(f"[ivy-6000] {msg}")
                         Clock.schedule_once(lambda *_, m=msg: self.on_voice_failed(m))
                 if not spoken and job == self.current:
@@ -193,9 +195,36 @@ class ChatScreen(BoxLayout):
         self.performer.speaker.stop()
         self.performer.voice_style = self.app.skin.voice
         self.performer.voice_override = s.voice_name
-        self.performer.speaker = tts.make_speaker(self.app.skin.voice, s.voice_name)
+        status = lambda msg: Clock.schedule_once(lambda *_: self._voice_status(msg))  # noqa: E731
+        speaker = tts.make_speaker(self.app.skin.voice, s.voice_name, s.voice_engine,
+                                   self.app.voices_dir, status)
+        self.performer.speaker = speaker
         self.performer.voice_on = s.voice_enabled
-        print(f"[ivy-6000] voice engine: {self.performer.speaker.name}")
+        print(f"[ivy-6000] voice engine: {speaker.name}")
+        if s.voice_enabled and hasattr(speaker, "prepare"):
+            # download/load the neural voice now, rather than when it first needs to speak
+            def warm():
+                try:
+                    speaker.prepare()
+                except Exception as e:
+                    print(f"[ivy-6000] couldn't prepare {speaker.name}: {e}")
+                    Clock.schedule_once(lambda *_, err=e: self._neural_unavailable(speaker, err))
+            threading.Thread(target=warm, daemon=True).start()
+
+    def _neural_unavailable(self, speaker, error):
+        if self.performer.speaker is not speaker:
+            return  # the voice has been changed since
+        s = self.app.settings
+        self.performer.speaker = tts.fallback(speaker, self.app.skin.voice, s.voice_name)
+        msg = (f"Couldn't get the natural voice ({error}). "
+               f"Using {self.performer.speaker.name} instead.")
+        if not self.performer.speaker.available:
+            msg += " " + tts.voice_help()
+        self._voice_status(msg)
+
+    def _voice_status(self, msg):
+        self.add_log("SYSTEM", msg)
+        self.update_status()
 
     def update_status(self):
         s = self.app.settings
@@ -315,7 +344,12 @@ class SettingsPopup(Popup):
                           TextInput(text=s.effort, multiline=False))
         self.fallbacks = row("Refusal fallbacks (Anthropic)", Switch(active=s.use_fallbacks))
         self.voice = row("Voice", Switch(active=s.voice_enabled))
-        self.voice_name = row("Voice name override (blank = skin's choice)",
+        engines = {"auto": "Natural if available", "neural": "Natural (Piper)", "system": "System voice"}
+        self.engine_keys = list(engines)
+        self.engine = row("Voice engine", Spinner(text=engines.get(s.voice_engine, engines["auto"]),
+                                                  values=list(engines.values())))
+        self.voice_name = row("Voice override (blank = character's own; e.g. Daniel, or "
+                              "en_GB-semaine-medium:poppy)",
                               TextInput(text=s.voice_name, multiline=False))
 
         buttons = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(6))
@@ -380,6 +414,7 @@ class SettingsPopup(Popup):
         s.use_fallbacks = self.fallbacks.active
         s.voice_enabled = self.voice.active
         s.voice_name = self.voice_name.text.strip()
+        s.voice_engine = self.engine_keys[self.engine.values.index(self.engine.text)]
         self.app.save_settings(reskin=True, greet=s.skin != old_skin)
         self.dismiss()
 
@@ -398,6 +433,10 @@ class Ivy6000App(App):
     def settings_path(self) -> Path:
         override = os.environ.get("IVY6000_SETTINGS")
         return Path(override) if override else Path(self.user_data_dir) / "settings.json"
+
+    @property
+    def voices_dir(self) -> Path:
+        return self.settings_path.parent / "voices"
 
     @property
     def user_skins_dir(self) -> Path:
