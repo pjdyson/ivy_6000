@@ -12,6 +12,7 @@ which writes ``skin.json`` plus PNG frames you can repaint in any pixel-art edit
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -67,9 +68,15 @@ OFFLINE_GENERIC = (
 )
 
 BUILTIN: dict[str, Skin] = {}
+FACES_DIR = Path(__file__).resolve().parent / "assets" / "faces"
 
 
 def _add(skin: Skin) -> None:
+    # Built-in characters use painted pixel-art frames (made by scripts/make_faces.py from a
+    # source portrait) when they're present; otherwise the generated face.
+    folder = FACES_DIR / skin.id
+    if skin.frames is None and (folder / "idle.png").is_file():
+        skin.frames = {n: str(folder / f"{n}.png") for n in FRAME_NAMES if (folder / f"{n}.png").is_file()}
     BUILTIN[skin.id] = skin
 
 
@@ -238,10 +245,15 @@ def all_skins(user_root: Path | None = None) -> dict[str, Skin]:
 def export_skin(skin: Skin, dest: Path, scale: int = 6) -> None:
     """Write a skin as an editable folder: skin.json + PNG frames."""
     dest.mkdir(parents=True, exist_ok=True)
-    frames = portrait.frames(skin.face)
-    for name, rgba in frames.items():
-        png = sprites.to_png(rgba, portrait.W, portrait.H, scale)
-        (dest / f"{name}.png").write_bytes(png)
+    if skin.frames:  # painted frames: copy them as they are
+        frames = {name: None for name in skin.frames}
+        for name, path in skin.frames.items():
+            shutil.copyfile(path, dest / f"{name}.png")
+    else:
+        frames = portrait.frames(skin.face)
+        for name, rgba in frames.items():
+            png = sprites.to_png(rgba, portrait.W, portrait.H, scale)
+            (dest / f"{name}.png").write_bytes(png)
     data = {
         "id": f"{skin.id}-custom",
         "name": f"{skin.name} (custom)",

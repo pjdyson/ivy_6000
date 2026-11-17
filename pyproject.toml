@@ -18,13 +18,16 @@ dependencies = [
 
 [project.optional-dependencies]
 claude = ["anthropic>=2.10"]
-dev = ["pytest", "anthropic>=2.10", "pyinstaller"]
+dev = ["pytest", "anthropic>=2.10", "pyinstaller", "pillow"]
 
 [project.scripts]
 ivy-6000 = "ivy6000.app:run"
 
 [tool.setuptools]
 packages = ["ivy6000"]
+
+[tool.setuptools.package-data]
+ivy6000 = ["assets/faces/*/*.png"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

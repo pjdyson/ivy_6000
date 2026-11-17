@@ -39,11 +39,16 @@ act for anything serious.
 | **MR PEMBERTON** | warm amber screen; ruddy, walrus moustache | concierge of a shabby seaside hotel: excruciatingly polite, barely contained exasperation | brisk, higher |
 | **DESMOND** | cyan screen; glasses, stubble | basement IT support: weary, pedantic, assumes user error, always fixes it properly | brisk |
 
-The faces are painterly 40×48 pixel portraits rendered by
-[`ivy6000/portrait.py`](ivy6000/portrait.py), in the style of a dark oil portrait done in
-pixel art: a 3D-ish head (brow, eye sockets, cheekbones, nose, lips, chin) lit by a single
-warm spotlight that falls away into deep brown shadow, rendered at 3× and averaged down into
-chunky blocks with slight per-block colour variation, like brush strokes.
+The built-in faces are painted pixel-art portraits (48×52) in
+[`ivy6000/assets/faces/`](ivy6000/assets/faces/), each a variation on one source portrait:
+different hood colours, skin tones, lighting and mirroring, plus painted-in stubble, a
+moustache or glasses, and frames for blinking, talking and thinking. They're made by
+[`scripts/make_faces.py`](scripts/make_faces.py) (`python scripts/make_faces.py portrait.png`,
+needs Pillow), so a different source portrait gives a whole new cast.
+
+Custom skins without their own PNGs get a generated face from
+[`ivy6000/portrait.py`](ivy6000/portrait.py) instead: a lit 3D-ish head rendered in the same
+dark, painterly style.
 
 ### Make your own
 

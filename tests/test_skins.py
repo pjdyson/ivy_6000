@@ -45,3 +45,13 @@ def test_broken_skins_are_skipped(tmp_path):
     (tmp_path / "noidle").mkdir()
     (tmp_path / "noidle" / "skin.json").write_text('{"frames": {"blink": "b.png"}}')
     assert skins.load_user_skins(tmp_path) == {}
+
+
+def test_builtin_characters_have_painted_frames():
+    for skin in skins.BUILTIN.values():
+        assert skin.frames, skin.id
+        assert set(skin.frames) == set(skins.FRAME_NAMES)
+        for path in skin.frames.values():
+            data = open(path, "rb").read(24)
+            assert data.startswith(b"\x89PNG")
+            assert (int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")) == (48, 52)
