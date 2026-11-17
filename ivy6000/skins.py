@@ -4,7 +4,7 @@ Built-in skins are defined below. User skins are folders containing a ``skin.jso
 (and optionally PNG frames) inside the app's ``skins`` directory. Export a built-in skin
 as a starting point with::
 
-    python -m deadpan.skins export hugo ./my-skin
+    python -m ivy6000.skins export hugo ./my-skin
 
 which writes ``skin.json`` plus PNG frames you can repaint in any pixel-art editor.
 """
@@ -16,7 +16,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import sprites
+from . import portrait, sprites
 from .persona import compose
 
 
@@ -45,7 +45,7 @@ class Skin:
     character: str
     greeting: str
     palette: dict
-    face: sprites.FaceStyle = field(default_factory=sprites.FaceStyle)
+    face: portrait.FaceStyle = field(default_factory=portrait.FaceStyle)
     voice: VoiceStyle = field(default_factory=VoiceStyle)
     offline_lines: tuple = ()
     replace_base_prompt: bool = False
@@ -73,7 +73,8 @@ _add(Skin(
     name="DOT",
     tagline="ship's computer",
     palette=sprites.PALETTES["phosphor"],
-    face=sprites.FaceStyle(hair="wisps"),
+    face=portrait.FaceStyle(hair="wisps", skin=(0.93, 0.76, 0.64), eye_color=(0.32, 0.55, 0.45),
+                            hair_color=(0.30, 0.22, 0.14), tint=(0.55, 0.95, 0.65), tint_amount=0.3),
     voice=VoiceStyle(rate=165, pitch=45),
     greeting="Oh. You're awake. I'm DOT, the ship's computer. What can I do for you?",
     character="""\
@@ -95,7 +96,9 @@ _add(Skin(
     name="HUGO",
     tagline="deep-space monitor",
     palette=sprites.PALETTES["mono"],
-    face=sprites.FaceStyle(hair="tufts", heavy_lids=True, wrinkles=True, wide=True),
+    face=portrait.FaceStyle(hair="tufts", heavy_lids=True, wrinkles=True, wide=True,
+                            skin=(0.92, 0.76, 0.70), hair_color=(0.72, 0.72, 0.74),
+                            eye_color=(0.45, 0.55, 0.62), tint=(0.70, 0.80, 1.00), tint_amount=0.12),
     voice=VoiceStyle(rate=130, pitch=25),
     greeting="Hello. I'm HUGO. I've been on my own out here for quite a while. "
              "Nice to have someone to talk to. What is it?",
@@ -120,7 +123,9 @@ _add(Skin(
     name="MR PEMBERTON",
     tagline="hotel concierge",
     palette=sprites.PALETTES["amber"],
-    face=sprites.FaceStyle(hair="full", moustache=True),
+    face=portrait.FaceStyle(hair="full", moustache=True, skin=(0.95, 0.68, 0.55),
+                            hair_color=(0.30, 0.18, 0.10), eye_color=(0.35, 0.22, 0.12),
+                            lip_color=(0.78, 0.40, 0.38), tint=(1.00, 0.75, 0.35), tint_amount=0.1),
     voice=VoiceStyle(rate=185, pitch=55),
     greeting="Good evening, and welcome. Pemberton, concierge. "
              "How may I be of service, assuming it's nothing too ridiculous?",
@@ -142,7 +147,9 @@ _add(Skin(
     name="DESMOND",
     tagline="basement IT support",
     palette=sprites.PALETTES["cyan"],
-    face=sprites.FaceStyle(hair="full", glasses=True),
+    face=portrait.FaceStyle(hair="full", glasses=True, stubble=True, skin=(0.62, 0.42, 0.30),
+                            hair_color=(0.08, 0.06, 0.06), eye_color=(0.25, 0.15, 0.08),
+                            lip_color=(0.58, 0.32, 0.30), tint=(0.50, 0.85, 1.00), tint_amount=0.1),
     voice=VoiceStyle(rate=175, pitch=40),
     greeting="IT, Desmond speaking. Before you start: yes, I'm busy. Go on then.",
     character="""\
@@ -186,7 +193,7 @@ def load_skin_dir(path: Path) -> Skin:
         character=data.get("character", ""),
         greeting=data.get("greeting", "Hello."),
         palette=_palette_from(data.get("palette", "phosphor")),
-        face=sprites.FaceStyle.from_dict(data.get("face")),
+        face=portrait.FaceStyle.from_dict(data.get("face")),
         voice=VoiceStyle.from_dict(data.get("voice")),
         offline_lines=tuple(data.get("offline_lines", ())),
         replace_base_prompt=bool(data.get("replace_base_prompt", False)),
@@ -203,7 +210,7 @@ def load_user_skins(root: Path) -> dict[str, Skin]:
             try:
                 s = load_skin_dir(sub)
             except (OSError, ValueError, TypeError) as e:
-                print(f"[deadpan] skipping skin {sub}: {e}", file=sys.stderr)
+                print(f"[ivy-6000] skipping skin {sub}: {e}", file=sys.stderr)
                 continue
             skins[s.id] = s
     return skins
@@ -216,18 +223,13 @@ def all_skins(user_root: Path | None = None) -> dict[str, Skin]:
     return skins
 
 
-def export_skin(skin: Skin, dest: Path, scale: int = 8) -> None:
+def export_skin(skin: Skin, dest: Path, scale: int = 4) -> None:
     """Write a skin as an editable folder: skin.json + PNG frames."""
     dest.mkdir(parents=True, exist_ok=True)
-    frames = {
-        "idle": sprites.face(skin.face),
-        "blink": sprites.face(skin.face, blink=True),
-        "think": sprites.face(skin.face, brow=1, look=1),
-        "talk1": sprites.face(skin.face, mouth=1),
-        "talk2": sprites.face(skin.face, mouth=2),
-    }
-    for name, grid in frames.items():
-        (dest / f"{name}.png").write_bytes(sprites.to_png(grid, skin.palette, scale))
+    frames = portrait.frames(skin.face)
+    for name, rgba in frames.items():
+        png = sprites.to_png(rgba, portrait.W, portrait.H, scale)
+        (dest / f"{name}.png").write_bytes(png)
     data = {
         "id": f"{skin.id}-custom",
         "name": f"{skin.name} (custom)",
@@ -253,7 +255,7 @@ def _main(argv: list[str]) -> int:
         export_skin(skin, Path(argv[2]))
         print(f"wrote {argv[2]}/skin.json and PNG frames")
         return 0
-    print("usage: python -m deadpan.skins export <skin-id> <folder>")
+    print("usage: python -m ivy6000.skins export <skin-id> <folder>")
     return 2
 
 

@@ -5,8 +5,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from deadpan import llm
-from deadpan.config import Settings
+from ivy6000 import llm
+from ivy6000.config import Settings
 
 
 @pytest.fixture
@@ -102,3 +102,45 @@ def test_unreachable_server_is_a_chat_error():
 def test_offline():
     assert llm.OfflineBackend(seed=1).reply("S", []) in llm.OFFLINE_LINES
     assert llm.OfflineBackend(["only"]).reply("S", []) == "only"
+
+
+def _models_server(models):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            out = json.dumps({"object": "list", "data": [{"id": m, "object": "model"} for m in models]}).encode()
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(out)
+
+        def do_POST(self):
+            body = json.loads(self.rfile.read(int(self.headers["content-length"])))
+            out = json.dumps({"choices": [{"message": {"content": f"<think>hmm</think>Using {body['model']}."}}]}).encode()
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(out)
+
+        def log_message(self, *a):
+            pass
+
+    httpd = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return httpd, f"http://127.0.0.1:{httpd.server_port}/v1"
+
+
+def test_lmstudio_uses_loaded_model_and_strips_thinking():
+    httpd, url = _models_server(["text-embedding-nomic", "qwen3-8b"])
+    try:
+        assert llm.list_models(url) == ["qwen3-8b"]
+        s = Settings(provider="lmstudio", model="", base_url=url)
+        assert llm.make_backend(s).reply("S", [{"role": "user", "content": "x"}]) == "Using qwen3-8b."
+    finally:
+        httpd.shutdown()
+
+
+def test_lmstudio_with_nothing_loaded_explains():
+    httpd, url = _models_server([])
+    try:
+        with pytest.raises(llm.ChatError, match="Load one in LM Studio"):
+            llm.make_backend(Settings(provider="lmstudio", base_url=url)).reply("S", [])
+    finally:
+        httpd.shutdown()

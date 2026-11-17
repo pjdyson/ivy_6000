@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.request
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 
-PROVIDERS = ("anthropic", "openai", "ollama", "offline")
+PROVIDERS = ("anthropic", "lmstudio", "ollama", "openai", "offline")
 
 # Sensible defaults per provider, applied when the user switches provider.
 PROVIDER_DEFAULTS = {
     "anthropic": {"model": "claude-opus-5-5", "base_url": ""},
     "openai": {"model": "gpt-4o-mini", "base_url": "https://api.openai.com/v1"},
-    "ollama": {"model": "llama3.2", "base_url": "http://localhost:11434/v1"},
+    # Blank model = use whichever model the local server has loaded.
+    "lmstudio": {"model": "", "base_url": "http://localhost:1234/v1"},
+    "ollama": {"model": "", "base_url": "http://localhost:11434/v1"},
     "offline": {"model": "", "base_url": ""},
 }
 
@@ -50,11 +53,26 @@ class Settings:
         return Settings(**data)
 
 
-def default_settings() -> Settings:
+LOCAL_PROVIDERS = ("lmstudio", "ollama")
+
+
+def _local_server_up(base_url: str, timeout: float = 0.4) -> bool:
+    try:
+        with urllib.request.urlopen(f"{base_url}/models", timeout=timeout) as resp:
+            return resp.status == 200
+    except (OSError, ValueError):
+        return False
+
+
+def default_settings(probe=_local_server_up) -> Settings:
+    """First launch: use a cloud key if one is set, else a local server if one is running."""
     if os.environ.get("ANTHROPIC_API_KEY"):
         return Settings().with_provider("anthropic")
     if os.environ.get("OPENAI_API_KEY"):
         return Settings().with_provider("openai")
+    for provider in LOCAL_PROVIDERS:
+        if probe(PROVIDER_DEFAULTS[provider]["base_url"]):
+            return Settings().with_provider(provider)
     return Settings()
 
 

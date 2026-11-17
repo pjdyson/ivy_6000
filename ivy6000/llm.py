@@ -5,6 +5,7 @@
               back to a plain HTTPS call to the same Messages API.
 * openai    - any OpenAI-compatible /chat/completions endpoint: OpenAI, LM Studio,
               llama.cpp, vLLM, LiteLLM and most corporate gateways.
+* lmstudio  - a local LM Studio server (Developer tab -> Start Server, port 1234).
 * ollama    - a local Ollama server (uses its OpenAI-compatible endpoint).
 * offline   - canned replies, no network. Handy for trying the UI.
 
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 import ssl
 import urllib.error
 import urllib.request
@@ -27,7 +29,7 @@ Message = dict  # {"role": "user" | "assistant", "content": str}
 ANTHROPIC_API = "https://api.anthropic.com"
 ANTHROPIC_VERSION = "2023-06-01"
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
-TIMEOUT_S = 120
+TIMEOUT_S = 300  # local models on a laptop can be slow
 
 
 class ChatError(Exception):
@@ -159,6 +161,29 @@ def parse_anthropic(data: dict) -> str:
 # --------------------------------------------------------------------------- OpenAI-compatible
 
 
+def _get_json(url: str, headers: dict, timeout: float = 10) -> dict:
+    req = urllib.request.Request(url, method="GET")
+    for k, v in headers.items():
+        req.add_header(k, v)
+    ctx = _ssl_context() if url.startswith("https") else None
+    try:
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise ChatError(f"HTTP {e.code} from {url}") from e
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise ChatError(f"Can't reach {url}. Is the server running?") from e
+
+
+def list_models(base_url: str, api_key: str = "") -> list[str]:
+    """Model ids from an OpenAI-compatible /models endpoint (LM Studio, Ollama, OpenAI)."""
+    headers = {"authorization": f"Bearer {api_key}"} if api_key else {}
+    data = _get_json(f"{base_url.rstrip('/')}/models", headers)
+    ids = [m.get("id", "") for m in data.get("data", []) if isinstance(m, dict)]
+    # Embedding models can't chat; keep them out of the way.
+    return [i for i in ids if i and "embed" not in i.lower()]
+
+
 class OpenAICompatBackend:
     def __init__(self, settings: Settings):
         self.s = settings
@@ -168,10 +193,19 @@ class OpenAICompatBackend:
         if settings.provider == "openai" and "api.openai.com" in settings.base_url and not self.key:
             raise ChatError("No OpenAI API key. Add one in settings or set OPENAI_API_KEY.")
 
+    def _model(self) -> str:
+        if self.s.model:
+            return self.s.model
+        models = list_models(self.s.base_url, self.key)
+        if not models:
+            hint = " Load one in LM Studio first." if self.s.provider == "lmstudio" else ""
+            raise ChatError(f"The server at {self.s.base_url} has no chat models available.{hint}")
+        return models[0]
+
     def reply(self, system: str, messages: list[Message]) -> str:
         headers = {"authorization": f"Bearer {self.key}"} if self.key else {}
         body = {
-            "model": self.s.model,
+            "model": self._model(),
             "max_tokens": self.s.max_tokens,
             "messages": [{"role": "system", "content": system}, *messages],
         }
@@ -179,12 +213,19 @@ class OpenAICompatBackend:
         return parse_openai(data)
 
 
+_THINK = re.compile(r"<think>.*?</think>", re.S)
+
+
 def parse_openai(data: dict) -> str:
     try:
         content = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as e:
         raise ChatError(f"Unexpected response: {str(data)[:200]}") from e
-    return (content or "").strip() or "..."
+    # Reasoning models (Qwen3, DeepSeek-R1, ...) may include their thinking inline.
+    content = _THINK.sub("", content or "")
+    if "</think>" in content:  # opening tag was cut off
+        content = content.split("</think>", 1)[1]
+    return content.strip() or "..."
 
 
 # --------------------------------------------------------------------------- offline
@@ -211,6 +252,6 @@ class OfflineBackend:
 def make_backend(settings: Settings, offline_lines=()) -> Backend:
     if settings.provider == "anthropic":
         return AnthropicBackend(settings)
-    if settings.provider in ("openai", "ollama"):
+    if settings.provider in ("openai", "lmstudio", "ollama"):
         return OpenAICompatBackend(settings)
     return OfflineBackend(offline_lines)

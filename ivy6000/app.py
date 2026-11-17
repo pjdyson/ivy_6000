@@ -22,6 +22,7 @@ from kivy.core.window import Window
 from kivy.metrics import dp, sp
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
+from kivy.uix.dropdown import DropDown
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
@@ -88,7 +89,7 @@ class Performer(threading.Thread):
                     try:
                         self.speaker.speak(line)
                     except Exception as e:  # a broken voice shouldn't stop the show
-                        print(f"[deadpan] speech failed, going silent: {e}")
+                        print(f"[ivy-6000] speech failed, going silent: {e}")
                         self.speaker = tts.Speaker()
                 else:
                     self._cancel.wait(max(1.2, len(line) / SILENT_CPS))
@@ -97,7 +98,7 @@ class Performer(threading.Thread):
 
 
 class ChatScreen(BoxLayout):
-    def __init__(self, app: "DeadpanApp", **kw):
+    def __init__(self, app: "Ivy6000App", **kw):
         super().__init__(orientation="vertical", spacing=dp(4), padding=dp(6), **kw)
         self.app = app
         self.history: list[llm.Message] = []
@@ -251,7 +252,7 @@ class ChatScreen(BoxLayout):
 
 
 class SettingsPopup(Popup):
-    def __init__(self, app: "DeadpanApp", **kw):
+    def __init__(self, app: "Ivy6000App", **kw):
         super().__init__(title="Settings", size_hint=(0.95, 0.92), title_font=FONT, **kw)
         self.app = app
         s = app.settings
@@ -275,7 +276,14 @@ class SettingsPopup(Popup):
 
         self.provider = row("Provider", Spinner(text=s.provider, values=config.PROVIDERS))
         self.provider.bind(text=self._provider_changed)
-        self.model = row("Model", TextInput(text=s.model, multiline=False))
+        model_row = BoxLayout(spacing=dp(4))
+        self.model = TextInput(text=s.model, multiline=False,
+                               hint_text="blank = whatever the server has loaded")
+        pick = Button(text="List", size_hint_x=None, width=dp(64))
+        pick.bind(on_release=self._list_models)
+        model_row.add_widget(self.model)
+        model_row.add_widget(pick)
+        row("Model", model_row)
         self.base_url = row("Base URL (blank = provider default)",
                             TextInput(text=s.base_url, multiline=False))
         self.api_key = row("API key (blank = use environment variable)",
@@ -300,6 +308,38 @@ class SettingsPopup(Popup):
         sv.add_widget(form)
         self.content = sv
 
+    def _list_models(self, button):
+        provider = self.provider.text
+        base = self.base_url.text.strip() or config.PROVIDER_DEFAULTS.get(provider, {}).get("base_url", "")
+        if provider in ("anthropic", "offline") or not base:
+            self.model.hint_text = "listing works for LM Studio, Ollama and OpenAI-compatible servers"
+            return
+        key = self.api_key.text.strip() or config.Settings(provider=provider).resolved_api_key()
+        button.text = "..."
+
+        def work():
+            try:
+                models, err = llm.list_models(base, key), ""
+            except llm.ChatError as e:
+                models, err = [], str(e)
+            Clock.schedule_once(lambda *_: self._show_models(button, models, err))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _show_models(self, button, models, err):
+        button.text = "List"
+        if not models:
+            self.model.text = ""
+            self.model.hint_text = err or "no models found: load one in LM Studio"
+            return
+        dd = DropDown()
+        for m in models:
+            b = Button(text=m, size_hint_y=None, height=dp(40), shorten=True,
+                       text_size=(self.model.width, None))
+            b.bind(on_release=lambda b: (setattr(self.model, "text", b.text), dd.dismiss()))
+            dd.add_widget(b)
+        dd.open(self.model)
+
     def _provider_changed(self, _spinner, provider):
         d = config.PROVIDER_DEFAULTS.get(provider, {})
         self.model.text = d.get("model", "")
@@ -321,8 +361,8 @@ class SettingsPopup(Popup):
         self.dismiss()
 
 
-class DeadpanApp(App):
-    title = "Deadpan"
+class Ivy6000App(App):
+    title = "IVY-6000"
 
     def build(self):
         Window.softinput_mode = "below_target"
@@ -333,7 +373,7 @@ class DeadpanApp(App):
 
     @property
     def settings_path(self) -> Path:
-        override = os.environ.get("DEADPAN_SETTINGS")
+        override = os.environ.get("IVY6000_SETTINGS")
         return Path(override) if override else Path(self.user_data_dir) / "settings.json"
 
     @property
@@ -367,4 +407,4 @@ class DeadpanApp(App):
 
 
 def run():
-    DeadpanApp().run()
+    Ivy6000App().run()

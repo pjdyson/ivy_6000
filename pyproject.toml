@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "deadpan"
+name = "ivy-6000"
 version = "0.1.0"
-description = "A pixelated, deadpan floating-head front end for LLM chat (Claude, OpenAI-compatible, Ollama)."
+description = "A pixelated, deadpan floating-head front end for LLM chat (Claude, LM Studio, Ollama, OpenAI-compatible)."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
@@ -20,10 +20,10 @@ claude = ["anthropic>=2.10"]
 dev = ["pytest", "anthropic>=2.10", "pyinstaller"]
 
 [project.scripts]
-deadpan = "deadpan.app:run"
+ivy-6000 = "ivy6000.app:run"
 
 [tool.setuptools]
-packages = ["deadpan"]
+packages = ["ivy6000"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

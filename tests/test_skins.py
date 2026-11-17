@@ -1,7 +1,7 @@
 import json
 
-from deadpan import skins
-from deadpan.persona import BASE_PROMPT
+from ivy6000 import skins
+from ivy6000.persona import BASE_PROMPT
 
 
 def test_builtin_prompts_combine_base_and_character():
@@ -33,6 +33,8 @@ def test_minimal_procedural_skin_and_replace_base(tmp_path):
     skin = skins.all_skins(tmp_path / "skins")["plain"]
     assert skin.system_prompt() == "Only this."
     assert skin.face.glasses and skin.frames is None
+    assert skin.face.hair == "bald"
+    assert skin.face.hair == "bald"
     assert "dot" in skins.all_skins(tmp_path / "skins")
 
 

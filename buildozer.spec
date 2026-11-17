@@ -1,14 +1,14 @@
 [app]
-title = Deadpan
-package.name = deadpan
-package.domain = org.deadpan
+title = IVY-6000
+package.name = ivy6000
+package.domain = io.github.pjdyson
 source.dir = .
 source.include_exts = py,png,json
 source.exclude_dirs = tests,bin,build,dist,.venv,.github,.buildozer
 version = 0.1.0
 
 # The Anthropic SDK is NOT listed: its compiled dependencies don't build for Android.
-# The app talks to the Claude API over plain HTTPS there instead (see deadpan/llm.py).
+# The app talks to the Claude API over plain HTTPS there instead (see ivy6000/llm.py).
 requirements = python3,kivy==2.3.1,certifi
 
 orientation = portrait

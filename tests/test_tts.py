@@ -1,5 +1,5 @@
-from deadpan import tts
-from deadpan.skins import VoiceStyle
+from ivy6000 import tts
+from ivy6000.skins import VoiceStyle
 
 
 def test_speakable_strips_code_markdown_and_urls():
