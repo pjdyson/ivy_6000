@@ -138,6 +138,8 @@ class AnthropicBackend:
         if resp.stop_reason == "refusal":
             return REFUSAL_LINE
         text = "".join(b.text for b in resp.content if b.type == "text").strip()
+        if text and resp.stop_reason == "max_tokens":
+            text = trim_cut_off(text)
         return text or "..."
 
     def _reply_http(self, system: str, messages: list[Message]) -> str:
@@ -151,11 +153,20 @@ class AnthropicBackend:
         return parse_anthropic(data)
 
 
+def trim_cut_off(text: str) -> str:
+    """A reply that hit the length limit: cut back to the last complete sentence."""
+    m = re.search(r"^(.*[.!?…])[\"')\]]*(?=\s|$)", text, re.S)
+    return m.group(0).strip() if m and len(m.group(0)) > 20 else text.strip() + "..."
+
+
 def parse_anthropic(data: dict) -> str:
     if data.get("stop_reason") == "refusal":
         return REFUSAL_LINE
     parts = [b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"]
-    return "".join(parts).strip() or "..."
+    text = "".join(parts).strip()
+    if text and data.get("stop_reason") == "max_tokens":
+        text = trim_cut_off(text)
+    return text or "..."
 
 
 # --------------------------------------------------------------------------- OpenAI-compatible
@@ -218,14 +229,20 @@ _THINK = re.compile(r"<think>.*?</think>", re.S)
 
 def parse_openai(data: dict) -> str:
     try:
-        content = data["choices"][0]["message"]["content"]
+        choice = data["choices"][0]
+        content = choice["message"]["content"]
     except (KeyError, IndexError, TypeError) as e:
         raise ChatError(f"Unexpected response: {str(data)[:200]}") from e
     # Reasoning models (Qwen3, DeepSeek-R1, ...) may include their thinking inline.
     content = _THINK.sub("", content or "")
     if "</think>" in content:  # opening tag was cut off
         content = content.split("</think>", 1)[1]
-    return content.strip() or "..."
+    if "<think>" in content:  # ran out of room while still thinking
+        content = content.split("<think>", 1)[0]
+    content = content.strip()
+    if content and choice.get("finish_reason") == "length":
+        content = trim_cut_off(content)
+    return content or "..."
 
 
 # --------------------------------------------------------------------------- offline

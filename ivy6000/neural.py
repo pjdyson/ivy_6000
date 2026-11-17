@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import logging
 import os
 import shutil
 import ssl
@@ -20,6 +21,9 @@ import threading
 import urllib.request
 import wave
 from pathlib import Path
+
+# Piper logs every sentence's phonemes at DEBUG, and Kivy turns DEBUG on for everything.
+logging.getLogger("piper").setLevel(logging.WARNING)
 
 URL = ("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/"
        "{family}/{code}/{name}/{quality}/{voice_id}{ext}?download=true")

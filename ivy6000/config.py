@@ -29,7 +29,9 @@ class Settings:
     model: str = ""
     base_url: str = ""
     api_key: str = ""
-    max_tokens: int = 2048
+    # A ceiling, not a target: the persona keeps replies short. Generous enough that a
+    # model which thinks first (Claude, Qwen3, DeepSeek-R1) still has room to answer.
+    max_tokens: int = 1200
     # Anthropic only. "low" keeps chat snappy; blank leaves it to the model default.
     effort: str = "low"
     # Anthropic only: let the API retry a declined request on a fallback model.
@@ -85,6 +87,8 @@ def load(path: Path) -> Settings:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return default_settings()
+    if raw.get("max_tokens") in (1024, 2048):  # old defaults: move to the new one
+        raw.pop("max_tokens")
     known = {f.name for f in fields(Settings)}
     return Settings(**{k: v for k, v in raw.items() if k in known})
 

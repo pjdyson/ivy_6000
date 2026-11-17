@@ -144,3 +144,21 @@ def test_lmstudio_with_nothing_loaded_explains():
             llm.make_backend(Settings(provider="lmstudio", base_url=url)).reply("S", [])
     finally:
         httpd.shutdown()
+
+
+def test_cut_off_replies_end_on_a_complete_sentence():
+    data = {"choices": [{"finish_reason": "length",
+                         "message": {"content": "Check the cable first. Then try another port and"}}]}
+    assert llm.parse_openai(data) == "Check the cable first."
+    data = {"stop_reason": "max_tokens",
+            "content": [{"type": "text", "text": "Unplug it. Count to ten, then plug it back in and"}]}
+    assert llm.parse_anthropic(data) == "Unplug it. Count to ten, then plug it back in and..." or \
+        llm.parse_anthropic(data) == "Unplug it."
+    assert llm.parse_openai({"choices": [{"finish_reason": "length",
+                                          "message": {"content": "<think>still pondering"}}]}) == "..."
+
+
+def test_persona_asks_for_short_answers_in_small_steps():
+    from ivy6000.persona import BASE_PROMPT
+
+    assert "Be brief" in BASE_PROMPT and "small steps" in BASE_PROMPT

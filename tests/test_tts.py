@@ -46,3 +46,12 @@ def test_fallback_chain_ends_silent():
     assert not isinstance(nxt, tts.WindowsSpeaker)
     assert tts.fallback(nxt, VoiceStyle()).available is False
     assert tts.voice_help()
+
+
+def test_numbered_lists_are_spoken_as_steps_not_split_off():
+    text = "Here's how to fix it:\n1. Check the cable.\n2. Try another port.\nIt's 42. Honestly."
+    lines = tts.sentences(tts.speakable(text))
+    assert "1) Check the cable." in " ".join(lines)
+    assert not any(line.strip() in ("1.", "2.", "it: 1.") for line in lines)
+    assert any(line.startswith("2) Try another port.") or "2) Try another port." in line for line in lines)
+    assert "42." in " ".join(lines)  # ordinary numbers left alone

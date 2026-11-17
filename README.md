@@ -28,9 +28,11 @@ if `OPENAI_API_KEY` is set, otherwise LM Studio or Ollama if one is running loca
 ## Characters (skins)
 
 A skin bundles a face, colour scheme, personality and voice. All of them share the same
-ground rules (in [`ivy6000/persona.py`](ivy6000/persona.py)): be genuinely useful first,
-with dry British wit as the undercurrent, never at the expense of the facts, and drop the
-act for anything serious.
+ground rules (in [`ivy6000/persona.py`](ivy6000/persona.py)): short answers (one to three
+sentences), how-tos one small step at a time with an offer to continue, accurate first,
+with dry British wit as the undercurrent, and no act at all for anything serious. Ask for
+"the full explanation" when you want more. The model is also told your operating system
+and today's date, so practical answers fit your machine.
 
 | Skin | Look | Character | Voice |
 | :--- | :--- | :-------- | :---- |
@@ -160,6 +162,12 @@ buildozer android debug            # Linux/WSL2/macOS; first run downloads the S
 ```
 
 Add `plyer` to `requirements` in `buildozer.spec` for voice on Android.
+
+## Troubleshooting
+
+- The console is quiet by default; Kivy's own log goes to `~/.kivy/logs/`. Run with
+  `IVY6000_DEBUG=1 ivy-6000` to see everything.
+- On Linux, `sudo apt install xclip` gives Kivy full copy/paste support.
 
 ## Develop
 

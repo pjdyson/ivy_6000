@@ -55,3 +55,15 @@ def test_builtin_characters_have_painted_frames():
             data = open(path, "rb").read(24)
             assert data.startswith(b"\x89PNG")
             assert (int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")) == (48, 52)
+
+
+def test_context_tells_the_model_about_the_users_system():
+    import datetime
+
+    from ivy6000 import persona
+
+    ctx = persona.context(datetime.date(2026, 11, 18))
+    assert persona.operating_system() in ctx
+    assert "Wednesday 18 November 2026" in ctx
+    prompt = skins.BUILTIN["desmond"].system_prompt(ctx)
+    assert prompt.rstrip().endswith(ctx)

@@ -7,7 +7,17 @@ import queue
 import threading
 from pathlib import Path
 
-from kivy.utils import platform
+# Kivy reads these at import time. Use SDL's clipboard rather than probing for xclip/xsel
+# (which prints tracebacks when they aren't installed).
+os.environ.setdefault("KIVY_CLIPBOARD", "sdl2")
+if not os.environ.get("IVY6000_DEBUG"):
+    os.environ.setdefault("KIVY_NO_CONSOLELOG", "1")  # Kivy still logs to ~/.kivy/logs
+
+from kivy.logger import LOG_LEVELS, Logger  # noqa: E402
+from kivy.utils import platform  # noqa: E402
+
+if not os.environ.get("IVY6000_DEBUG"):
+    Logger.setLevel(LOG_LEVELS["warning"])  # set IVY6000_DEBUG=1 for Kivy's full log
 
 if platform not in ("android", "ios"):
     from kivy.config import Config
@@ -32,7 +42,7 @@ from kivy.uix.switch import Switch
 from kivy.uix.textinput import TextInput
 from kivy.uix.togglebutton import ToggleButton
 
-from . import config, llm, skins, tts
+from . import config, llm, persona, skins, tts
 from .head import PixelHead
 
 FONT = "RobotoMono-Regular"
@@ -164,6 +174,7 @@ class ChatScreen(BoxLayout):
     # ------------------------------------------------------------------ skin & voice
 
     def apply_skin(self, greet: bool):
+        self.performer.cancel()  # don't finish the old character's sentence in the new voice
         skin = self.app.skin
         pal = skin.palette
         fg, dim, dark = _rgba(pal["S"]), _rgba(pal["D"]), _rgba(pal["H"])
@@ -274,7 +285,7 @@ class ChatScreen(BoxLayout):
         s, skin = self.app.settings, self.app.skin
         try:
             backend = llm.make_backend(s, skin.offline_lines)
-            reply = backend.reply(skin.system_prompt(), llm.trim_history(self.history, s.history_limit))
+            reply = backend.reply(skin.system_prompt(persona.context()), llm.trim_history(self.history, s.history_limit))
             ok = True
         except llm.ChatError as e:
             reply, ok = f"Something's gone wrong with my connection. {e}", False

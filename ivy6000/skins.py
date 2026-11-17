@@ -57,8 +57,8 @@ class Skin:
     replace_base_prompt: bool = False
     frames: dict | None = None  # frame name -> PNG path, for image-based skins
 
-    def system_prompt(self) -> str:
-        return compose(self.character, self.replace_base_prompt)
+    def system_prompt(self, extra: str = "") -> str:
+        return compose(self.character, self.replace_base_prompt, extra)
 
 
 OFFLINE_GENERIC = (

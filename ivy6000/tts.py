@@ -37,7 +37,11 @@ def speakable(text: str) -> str:
     text = _URL.sub("the link in the log", text)
     text = re.sub(r"[`*_#>]", "", text)
     text = re.sub(r"^\s*[-•]\s+", "", text, flags=re.M)
-    return re.sub(r"\s+", " ", text).strip()
+    # "1. Check the cable" -> "1) Check the cable", so the number isn't split off as a sentence
+    # (only at the start of a line or after a colon/full stop, so "it's 42. Honestly" is left alone)
+    text = re.sub(r"(?m)(^|[:.!?]\s+)(\d{1,2})\.\s+(?=[A-Z(\"'])", r"\1\2) ", text)
+    text = re.sub(r"[ \t]+", " ", text)
+    return "\n".join(line.strip() for line in text.splitlines() if line.strip())
 
 
 def sentences(text: str) -> list[str]:
@@ -47,7 +51,7 @@ def sentences(text: str) -> list[str]:
     for p in (p.strip() for p in parts):
         if not p:
             continue
-        if out and len(out[-1]) < 25:  # glue very short bits on, avoids choppy speech
+        if out and len(out[-1]) < 25 and not re.match(r"\d{1,2}\)", p):  # avoid choppy speech
             out[-1] = f"{out[-1]} {p}"
         else:
             out.append(p)
