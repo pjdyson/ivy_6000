@@ -144,7 +144,7 @@ class PixelHead(Widget):
         tint = self.skin.face.tint if not self.skin.frames else self.skin.palette["S"]
         tw, th = texture.size
         scale = max(0.1, min(self.width / tw, self.height / th) * 0.92)
-        unit = scale * tw / 64  # roughly one portrait pixel
+        unit = scale * tw / portrait.W  # roughly one portrait pixel
         bob = math.sin(self.t * 1.3) * unit * 1.6
         sway = math.sin(self.t * 0.7) * unit * 0.7
         ox = self.x + (self.width - scale * tw) / 2 + sway + self.glitch_shift * unit
@@ -155,7 +155,7 @@ class PixelHead(Widget):
             Color(0.01, 0.02, 0.02, 1)
             Rectangle(pos=self.pos, size=self.size)
             for i, a in enumerate((0.04, 0.05, 0.06)):  # glow in the screen's colour
-                r = unit * (40 - i * 5)
+                r = unit * (34 - i * 4)
                 Color(*tint, a)
                 Ellipse(pos=(ox + scale * tw / 2 - r * 0.85, oy + scale * th / 2 - r),
                         size=(r * 1.7, r * 2))

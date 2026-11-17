@@ -1,12 +1,12 @@
 # IVY-6000
 
-A small desktop chat app for LLMs, fronted by a shaded, full-colour pixel-portrait head
+A small desktop chat app for LLMs, fronted by a shaded, full-colour pixel-art head
 floating on a CRT screen.
 It gives properly useful, informative answers with a dry undercurrent of British sitcom
 humour, and reads them aloud while the head blinks, raises an eyebrow as it thinks, and
 mouths along with a subtitle.
 
-![The four built-in characters, and the settings screen set up for LM Studio](docs/skins.png)
+![The four built-in characters](docs/skins.png)
 
 Pure Python + [Kivy](https://kivy.org): runs on Windows, macOS and Linux, and the same code
 can be packaged for Android later.
@@ -39,10 +39,11 @@ act for anything serious.
 | **MR PEMBERTON** | warm amber screen; ruddy, walrus moustache | concierge of a shabby seaside hotel: excruciatingly polite, barely contained exasperation | brisk, higher |
 | **DESMOND** | cyan screen; glasses, stubble | basement IT support: weary, pedantic, assumes user error, always fixes it properly | brisk |
 
-The faces are 64×72 pixel portraits rendered by [`ivy6000/portrait.py`](ivy6000/portrait.py):
-a lit 3D-ish height field (brow, eye sockets, cheekbones, nose, lips, chin) with skin, hair,
-eye and lip colours, a warm key light, cool fill and a rim light in the screen's colour,
-then quantised and dithered so it reads as pixel art.
+The faces are 60×72 pixel portraits rendered by [`ivy6000/portrait.py`](ivy6000/portrait.py):
+a 3D-ish height field (brow, eye sockets, cheekbones, nose, lips, chin) with natural skin,
+hair, eye and lip colours, almond eyes with lids and lashes, lit by a soft warm key light
+with warm shadows (like light under skin), a cool fill and a faint rim light in the screen's
+colour, then quantised and dithered so it reads as pixel art.
 
 ### Make your own
 
@@ -66,7 +67,7 @@ directory. It appears under *Character* in settings.
 | `character` | the personality, added to the shared ground rules |
 | `replace_base_prompt` | `true` to use `character` as the whole system prompt instead |
 | `frames` | PNG files per frame (only `idle` is required); omit to use a generated face |
-| `face` | generated face: `hair` (`wisps`/`tufts`/`full`/`bald`), `heavy_lids`, `moustache`, `glasses`, `wrinkles`, `wide`, `stubble`; colours `skin`, `hair_color`, `eye_color`, `lip_color` as `[r, g, b]` (0-1); `tint` (screen colour) and `tint_amount` (0 = natural colour, 1 = monochrome); `levels` (colour steps; lower is chunkier) |
+| `face` | generated face: `hair` (`full`/`curly`/`wisps`/`tufts`/`bald`), `heavy_lids`, `moustache`, `glasses`, `wrinkles`, `wide`, `stubble`, `smile` (0-1); colours `skin`, `hair_color`, `eye_color`, `lip_color` as `[r, g, b]` (0-1); `tint` (screen colour) and `tint_amount` (0 = natural colour, 1 = monochrome); `levels` (colour steps; lower is chunkier) |
 | `palette` | UI colours: `phosphor`, `amber`, `mono`, `cyan`, or a map of colours |
 | `voice` | `rate` (words/min), `pitch` (0-99, Linux only), `prefer` (voice names to try, in order) |
 | `offline_lines` | what it says when no model is connected |
@@ -77,10 +78,14 @@ Speech uses whatever the computer already has; no cloud service is needed.
 
 - **macOS**: the built-in `say` command. Skins prefer British voices (Daniel, then Arthur). Add
   more under System Settings → Accessibility → Spoken Content → System voice → Manage voices.
-- **Windows**: SAPI voices via `pyttsx3` (installed automatically). For a British male voice,
-  add *English (United Kingdom)* under Settings → Time & language → Speech.
-- **Linux**: install `espeak-ng` (`sudo apt install espeak-ng`). Pitch works here; try a voice
-  override like `en-gb+m3` in settings.
+- **Windows**: Windows' own speech engine, driven through PowerShell (nothing to install;
+  `pyttsx3` is used as a backup). For a British male voice, add *English (United Kingdom)*
+  under Settings → Time & language → Speech, then pick *George* via *Voice name override*.
+- **Linux**: `espeak-ng` if installed (`sudo apt install espeak-ng`; pitch works here, try a
+  voice override like `en-gb+m3`), otherwise the desktop's speech dispatcher (`spd-say`).
+
+The status under the top bar shows which engine is in use. If it says **no voice**, the app
+also writes what to install into the chat log.
 
 Each sentence is spoken in turn, with the subtitle and mouth kept in step. Code blocks and
 links aren't read out ("I've put the code in the log"). To force a particular voice, type its

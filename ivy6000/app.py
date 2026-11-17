@@ -58,11 +58,13 @@ def _escape(text: str) -> str:
 class Performer(threading.Thread):
     """Speaks replies sentence by sentence on its own thread, driving subtitle and mouth."""
 
-    def __init__(self, on_line, on_done):
+    def __init__(self, on_line, on_done, on_voice_failed):
         super().__init__(daemon=True)
         self.jobs: queue.Queue = queue.Queue()
-        self.on_line, self.on_done = on_line, on_done
+        self.on_line, self.on_done, self.on_voice_failed = on_line, on_done, on_voice_failed
         self.speaker: tts.Speaker = tts.Speaker()
+        self.voice_style = None
+        self.voice_override = ""
         self.voice_on = True
         self.current = 0
         self._cancel = threading.Event()
@@ -85,13 +87,21 @@ class Performer(threading.Thread):
                 if job != self.current:
                     break
                 Clock.schedule_once(lambda *_, l=line: self.on_line(l))
-                if self.voice_on and self.speaker.available:
+                spoken = False
+                while self.voice_on and self.speaker.available and job == self.current:
                     try:
                         self.speaker.speak(line)
+                        spoken = True
+                        break
                     except Exception as e:  # a broken voice shouldn't stop the show
-                        print(f"[ivy-6000] speech failed, going silent: {e}")
-                        self.speaker = tts.Speaker()
-                else:
+                        if job != self.current or not self.voice_on:
+                            break  # we interrupted it ourselves
+                        failed = self.speaker
+                        self.speaker = tts.fallback(failed, self.voice_style, self.voice_override)
+                        msg = f"{failed.name} failed ({e}); trying {self.speaker.name}."
+                        print(f"[ivy-6000] {msg}")
+                        Clock.schedule_once(lambda *_, m=msg: self.on_voice_failed(m))
+                if not spoken and job == self.current:
                     self._cancel.wait(max(1.2, len(line) / SILENT_CPS))
             if job == self.current:
                 Clock.schedule_once(lambda *_: self.on_done())
@@ -145,7 +155,7 @@ class ChatScreen(BoxLayout):
         bar.add_widget(self.send_btn)
         self.add_widget(bar)
 
-        self.performer = Performer(self._show_line, self._done_speaking)
+        self.performer = Performer(self._show_line, self._done_speaking, self._voice_failed)
         self.performer.start()
         self.apply_skin(greet=True)
 
@@ -171,6 +181,8 @@ class ChatScreen(BoxLayout):
         Window.clearcolor = (0.01, 0.02, 0.02, 1)
         self.update_voice()
         self.update_status()
+        if self.app.settings.voice_enabled and not self.performer.speaker.available:
+            Clock.schedule_once(lambda *_: self.add_log("SYSTEM", tts.voice_help()), 1.0)
         if greet:
             self.history.clear()
             self.log.clear_widgets()
@@ -178,8 +190,12 @@ class ChatScreen(BoxLayout):
 
     def update_voice(self):
         s = self.app.settings
+        self.performer.speaker.stop()
+        self.performer.voice_style = self.app.skin.voice
+        self.performer.voice_override = s.voice_name
         self.performer.speaker = tts.make_speaker(self.app.skin.voice, s.voice_name)
         self.performer.voice_on = s.voice_enabled
+        print(f"[ivy-6000] voice engine: {self.performer.speaker.name}")
 
     def update_status(self):
         s = self.app.settings
@@ -187,11 +203,18 @@ class ChatScreen(BoxLayout):
         self.status.text = f"{s.provider}\n{voice}"
         self.status.halign = "right"
 
+    def _voice_failed(self, msg):
+        self.update_status()
+        if not self.performer.speaker.available:
+            self.add_log("SYSTEM", f"{msg} {tts.voice_help()}")
+
     def _vox_toggled(self, _btn, state):
         self.app.settings.voice_enabled = state == "down"
         self.performer.voice_on = self.app.settings.voice_enabled
         if not self.app.settings.voice_enabled:
             self.performer.speaker.stop()
+        elif not self.performer.speaker.available:
+            self.add_log("SYSTEM", tts.voice_help())
         self.app.save_settings(reskin=False)
 
     # ------------------------------------------------------------------ chat flow

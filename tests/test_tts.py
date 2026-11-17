@@ -25,3 +25,24 @@ def test_espeak_command_uses_voice_style():
 def test_make_speaker_always_returns_something():
     sp = tts.make_speaker(VoiceStyle())
     assert hasattr(sp, "speak") and isinstance(sp.name, str)
+
+
+def test_windows_speaker_builds_a_safe_powershell_script():
+    sp = tts.WindowsSpeaker(VoiceStyle(rate=130, prefer=("George", "it's")))
+    cmd = sp.command()
+    assert cmd[0] == "powershell" and cmd[-1] == sp.script
+    assert "$s.Rate = -4" in sp.script
+    assert "'George', 'its', 'en-GB'" in sp.script   # quotes stripped from names
+
+
+def test_spd_say_command():
+    sp = tts.SpdSaySpeaker("/usr/bin/spd-say", VoiceStyle(rate=130))
+    assert sp._cmd("Hi.") == ["/usr/bin/spd-say", "-w", "-l", "en-GB", "-r", "-48", "--", "Hi."]
+
+
+def test_fallback_chain_ends_silent():
+    win = tts.WindowsSpeaker(VoiceStyle())
+    nxt = tts.fallback(win, VoiceStyle())
+    assert not isinstance(nxt, tts.WindowsSpeaker)
+    assert tts.fallback(nxt, VoiceStyle()).available is False
+    assert tts.voice_help()
