@@ -101,3 +101,4 @@ def test_unreachable_server_is_a_chat_error():
 
 def test_offline():
     assert llm.OfflineBackend(seed=1).reply("S", []) in llm.OFFLINE_LINES
+    assert llm.OfflineBackend(["only"]).reply("S", []) == "only"

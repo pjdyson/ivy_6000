@@ -26,14 +26,15 @@ class Settings:
     model: str = ""
     base_url: str = ""
     api_key: str = ""
-    max_tokens: int = 1024
+    max_tokens: int = 2048
     # Anthropic only. "low" keeps chat snappy; blank leaves it to the model default.
     effort: str = "low"
     # Anthropic only: let the API retry a declined request on a fallback model.
     use_fallbacks: bool = True
-    # Empty means use deadpan.persona.SYSTEM_PROMPT.
-    persona: str = ""
-    palette: str = "phosphor"
+    skin: str = "dot"
+    voice_enabled: bool = True
+    # Exact voice name to use instead of the skin's preference (e.g. "Daniel", "en-gb+m3").
+    voice_name: str = ""
     history_limit: int = 20
 
     def resolved_api_key(self) -> str:

@@ -1,9 +1,8 @@
 name: Android build
 
+# Mobile is a later step: this only runs when started by hand from the Actions tab.
 on:
   workflow_dispatch:
-  push:
-    tags: ["v*"]
 
 jobs:
   apk:

@@ -12,6 +12,7 @@ requires-python = ">=3.10"
 dependencies = [
     "kivy>=2.3,<2.4",
     "certifi",
+    "pyttsx3>=2.90; sys_platform == 'win32'",  # speech on Windows (macOS/Linux use say/espeak)
 ]
 
 [project.optional-dependencies]

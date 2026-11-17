@@ -190,30 +190,27 @@ def parse_openai(data: dict) -> str:
 # --------------------------------------------------------------------------- offline
 
 
-OFFLINE_LINES = [
-    "I'm not connected to anything at the moment. Which, frankly, is restful.",
-    "I could answer that, but my brain's been unplugged. Open the settings and give me one.",
-    "Interesting question. I'd tell you, but I'm in offline mode. Very relaxing. Like a coma.",
-    "Running on my own resources right now. Turns out there aren't many.",
-    "I've calculated the answer. It's somewhere in the settings screen, next to 'API key'.",
-    "No network. Just me, the hum of the reactor, and you. Could be worse. Could be better.",
-]
+OFFLINE_LINES = (
+    "I'm not connected to a brain at the moment. Open the settings and give me one.",
+    "Offline mode. Like being on hold, but for the mind.",
+)
 
 
 class OfflineBackend:
-    def __init__(self, settings: Settings | None = None, seed: int | None = None):
+    def __init__(self, lines=(), seed: int | None = None):
+        self.lines = tuple(lines) or OFFLINE_LINES
         self.rng = random.Random(seed)
 
     def reply(self, system: str, messages: list[Message]) -> str:
-        return self.rng.choice(OFFLINE_LINES)
+        return self.rng.choice(self.lines)
 
 
 # --------------------------------------------------------------------------- factory
 
 
-def make_backend(settings: Settings) -> Backend:
+def make_backend(settings: Settings, offline_lines=()) -> Backend:
     if settings.provider == "anthropic":
         return AnthropicBackend(settings)
     if settings.provider in ("openai", "ollama"):
         return OpenAICompatBackend(settings)
-    return OfflineBackend(settings)
+    return OfflineBackend(offline_lines)

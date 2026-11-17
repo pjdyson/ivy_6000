@@ -4,7 +4,8 @@ from deadpan import config
 def test_round_trip(tmp_path):
     p = tmp_path / "s.json"
     s = config.Settings().with_provider("ollama")
-    s.persona = "be nice"
+    s.skin = "hugo"
+    s.voice_enabled = False
     config.save(s, p)
     assert config.load(p) == s
 
