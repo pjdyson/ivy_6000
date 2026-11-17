@@ -39,11 +39,11 @@ act for anything serious.
 | **MR PEMBERTON** | warm amber screen; ruddy, walrus moustache | concierge of a shabby seaside hotel: excruciatingly polite, barely contained exasperation | brisk, higher |
 | **DESMOND** | cyan screen; glasses, stubble | basement IT support: weary, pedantic, assumes user error, always fixes it properly | brisk |
 
-The faces are 60×72 pixel portraits rendered by [`ivy6000/portrait.py`](ivy6000/portrait.py):
-a 3D-ish height field (brow, eye sockets, cheekbones, nose, lips, chin) with natural skin,
-hair, eye and lip colours, almond eyes with lids and lashes, lit by a soft warm key light
-with warm shadows (like light under skin), a cool fill and a faint rim light in the screen's
-colour, then quantised and dithered so it reads as pixel art.
+The faces are painterly 40×48 pixel portraits rendered by
+[`ivy6000/portrait.py`](ivy6000/portrait.py), in the style of a dark oil portrait done in
+pixel art: a 3D-ish head (brow, eye sockets, cheekbones, nose, lips, chin) lit by a single
+warm spotlight that falls away into deep brown shadow, rendered at 3× and averaged down into
+chunky blocks with slight per-block colour variation, like brush strokes.
 
 ### Make your own
 
@@ -67,7 +67,7 @@ directory. It appears under *Character* in settings.
 | `character` | the personality, added to the shared ground rules |
 | `replace_base_prompt` | `true` to use `character` as the whole system prompt instead |
 | `frames` | PNG files per frame (only `idle` is required); omit to use a generated face |
-| `face` | generated face: `hair` (`full`/`curly`/`wisps`/`tufts`/`bald`), `heavy_lids`, `moustache`, `glasses`, `wrinkles`, `wide`, `stubble`, `smile` (0-1); colours `skin`, `hair_color`, `eye_color`, `lip_color` as `[r, g, b]` (0-1); `tint` (screen colour) and `tint_amount` (0 = natural colour, 1 = monochrome); `levels` (colour steps; lower is chunkier) |
+| `face` | generated face: `hair` (`full`/`curly`/`wisps`/`tufts`/`bald`), `heavy_lids`, `moustache`, `glasses`, `wrinkles`, `wide`, `stubble`, `smile` (0-1); colours `skin`, `hair_color`, `eye_color`, `lip_color` as `[r, g, b]` (0-1); `tint` (screen colour) and `tint_amount` (0 = natural colour, 1 = monochrome); `levels` (colour steps; lower is flatter) |
 | `palette` | UI colours: `phosphor`, `amber`, `mono`, `cyan`, or a map of colours |
 | `voice` | `rate` (words/min), `pitch` (0-99, Linux only), `prefer` (voice names to try, in order) |
 | `offline_lines` | what it says when no model is connected |

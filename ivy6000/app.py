@@ -180,7 +180,7 @@ class ChatScreen(BoxLayout):
         self.entry.foreground_color = fg
         self.entry.cursor_color = fg
         self.entry.hint_text_color = dim
-        Window.clearcolor = (0.01, 0.02, 0.02, 1)
+        Window.clearcolor = (0.045, 0.034, 0.028, 1)
         self.update_voice()
         self.update_status()
         if self.app.settings.voice_enabled and not self.performer.speaker.available:

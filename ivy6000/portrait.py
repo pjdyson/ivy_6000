@@ -5,7 +5,8 @@ cheekbones, nose, lips, chin and the folds beside the mouth. It is lit like a po
 photo: a soft,
 warm key light from the upper left that wraps round the forms, a cool fill, warmth in
 the shadows (light scattering under skin) and a faint rim light in the screen's colour.
-The result is quantised with an ordered dither so it reads as pixel art.
+It is rendered at 3x and averaged down into chunky blocks with a little colour variation
+per block, which gives a painterly pixel-art look, then posterised.
 
 ``render`` returns RGBA bytes, top row first.
 """
@@ -16,7 +17,10 @@ import math
 import random
 from dataclasses import dataclass
 
-W, H = 60, 72
+MW, MH = 60, 72            # model space the face is designed in
+W, H = 40, 48              # output pixels ("blocks")
+SS = 3                     # samples per block, per axis (rendered 3x then averaged down)
+STEP = MW / (W * SS)       # model units per internal sample
 CX, CY = 30.0, 40.0        # head centre
 EYE_Y, EYE_DX = 40.0, 8.5  # eye line and half the distance between the eyes
 BROW_Y = 35.2
@@ -42,7 +46,7 @@ class FaceStyle:
     lip_color: Color = (0.72, 0.43, 0.42)
     tint: Color = (0.55, 0.95, 0.65)  # screen colour, for the rim light and tint
     tint_amount: float = 0.1          # 0 = natural colour, 1 = monochrome screen
-    levels: int = 24                  # colour steps per channel (lower = chunkier)
+    levels: int = 28                  # colour steps per channel (lower = flatter)
     seed: int = 7                     # for hair and skin texture
 
     @classmethod
@@ -99,7 +103,7 @@ def render(style: FaceStyle | None = None, blink: bool = False, mouth: int = 0,
     """
     st = style or FaceStyle()
     rng = random.Random(st.seed)
-    noise = [[rng.random() for _ in range(W)] for _ in range(H)]
+    noise = [[rng.random() for _ in range(MW + 1)] for _ in range(MH + 1)]
     rx0 = 20.5 if st.wide else 19.0
     ry = 27.0
     opening = (0.0, 1.4, 2.8)[mouth]
@@ -154,11 +158,12 @@ def render(style: FaceStyle | None = None, blink: bool = False, mouth: int = 0,
         return False
 
     # ---- shape: region map and height field
-    region = [[None] * W for _ in range(H)]
-    hf = [[0.0] * W for _ in range(H)]
-    for y in range(H):
-        for x in range(W):
-            px, py = x + 0.5, y + 0.5
+    IW, IH = W * SS, H * SS
+    region = [[None] * IW for _ in range(IH)]
+    hf = [[0.0] * IW for _ in range(IH)]
+    for y in range(IH):
+        for x in range(IW):
+            px, py = (x + 0.5) * STEP, (y + 0.5) * STEP
             dx = px - CX
             z = None
             reg = None
@@ -166,16 +171,16 @@ def render(style: FaceStyle | None = None, blink: bool = False, mouth: int = 0,
             if d < 1:
                 reg = "face"
                 z = math.sqrt(1 - d) * 18 + 12
-                z += 1.6 * _g(px, py, CX, BROW_Y + 0.6, 12, 2.0)
-                z -= 2.0 * (_g(px, py, CX - EYE_DX, EYE_Y, 3.8, 2.6) + _g(px, py, CX + EYE_DX, EYE_Y, 3.8, 2.6))
-                z += 1.4 * (_g(px, py, CX - 11, 46, 4, 3) + _g(px, py, CX + 11, 46, 4, 3))
+                z += 2.6 * _g(px, py, CX, BROW_Y + 0.6, 11, 2.0)
+                z -= 3.0 * (_g(px, py, CX - EYE_DX, EYE_Y - 0.5, 3.8, 2.6) + _g(px, py, CX + EYE_DX, EYE_Y - 0.5, 3.8, 2.6))
+                z += 2.0 * (_g(px, py, CX - 11, 45.5, 3.8, 2.8) + _g(px, py, CX + 11, 45.5, 3.8, 2.8))
                 z += 2.2 * _g(px, py, CX, 45.0, 2.3, 5.0) + 2.4 * _g(px, py, CX, 49.3, 2.4, 1.9)
                 z += 1.0 * (_g(px, py, CX - 2.6, 50.4, 1.3, 1.1) + _g(px, py, CX + 2.6, 50.4, 1.3, 1.1))
                 z -= 0.8 * (_g(px, py, CX - 1.8, 51.3, 0.8, 0.5) + _g(px, py, CX + 1.8, 51.3, 0.8, 0.5))
                 z -= 0.5 * _g(px, py, CX, 53.3, 0.9, 1.0)
                 z += 1.0 * _g(px, py, CX, MOUTH_Y - 1.0, 4.5, 0.9)
                 z += 1.3 * _g(px, py, CX, MOUTH_Y + 1.4 + opening, 4.0, 1.0)
-                z -= (0.4 + 0.5 * age) * (_g(px, py, CX - 4.8, 54, 0.8, 2.4) + _g(px, py, CX + 4.8, 54, 0.8, 2.4))
+                z -= (0.8 + 0.6 * age) * (_g(px, py, CX - 4.8, 54, 0.9, 2.6) + _g(px, py, CX + 4.8, 54, 0.9, 2.6))
                 z += 1.6 * _g(px, py, CX, 63.5, 6.5, 2.5)
                 if mouth and _in_mouth(dx, py, opening, st.smile):
                     z -= 2.5
@@ -195,30 +200,33 @@ def render(style: FaceStyle | None = None, blink: bool = False, mouth: int = 0,
             if z is not None:
                 hf[y][x] = z
 
-    key = _norm((-0.45, -0.55, 0.70))
-    fill = _norm((0.75, 0.0, 0.65))
+    # moody portrait lighting: one warm key light, close to the front and above,
+    # falling off quickly into deep warm shadow; a faint cool fill from the right
+    key = _norm((-0.30, -0.50, 0.82))
+    fill = _norm((0.80, 0.10, 0.55))
     half = _norm((key[0], key[1], key[2] + 1))
-    warm, cool = (1.0, 0.94, 0.86), (0.70, 0.78, 0.95)
+    warm, cool = (1.0, 0.80, 0.55), (0.55, 0.62, 0.80)
+    lift = (0.055, 0.04, 0.032)   # shadows bottom out at a dark warm brown, not black
+    acc = [[None] * IW for _ in range(IH)]
     brow_col = _scale(st.hair_color, 0.75) if sum(st.hair_color) < 1.8 else _scale(st.hair_color, 0.85)
 
-    out = bytearray(W * H * 4)
-    for y in range(H):
-        for x in range(W):
+    for y in range(IH):
+        for x in range(IW):
             reg = region[y][x]
             if reg is None:
                 continue
-            px, py = x + 0.5, y + 0.5
+            px, py = (x + 0.5) * STEP, (y + 0.5) * STEP
             dx = px - CX
-            n_ = noise[y][x]
+            n_ = noise[int(py)][int(px)]
             z = hf[y][x]
 
             def at(xx, yy):
-                if 0 <= xx < W and 0 <= yy < H and region[yy][xx] is not None:
+                if 0 <= xx < IW and 0 <= yy < IH and region[yy][xx] is not None:
                     return hf[yy][xx]
-                return z - 1.5  # fall away at silhouettes
+                return z - 1.5 * STEP  # fall away at silhouettes
             zl, zr, zu, zd = at(x - 1, y), at(x + 1, y), at(x, y - 1), at(x, y + 1)
-            n = _norm((-(zr - zl) / 2, -(zd - zu) / 2, 1.0))
-            cavity = (zl + zr + zu + zd) / 4 - z   # positive in creases
+            n = _norm((-(zr - zl) / (2 * STEP), -(zd - zu) / (2 * STEP), 1.0))
+            cavity = ((zl + zr + zu + zd) / 4 - z) / (STEP * STEP)   # positive in creases
 
             gloss, sss = 0.12, 0.0
             if reg in ("face", "ear"):
@@ -250,30 +258,49 @@ def render(style: FaceStyle | None = None, blink: bool = False, mouth: int = 0,
 
             # ---- lighting
             ndl = n[0] * key[0] + n[1] * key[1] + n[2] * key[2]
-            diff = _clamp((ndl + 0.22) / 1.22)               # wrap lighting: soft shadows
+            diff = max(0.0, ndl) ** 1.3
             fil = _clamp(n[0] * fill[0] + n[1] * fill[1] + n[2] * fill[2])
-            spec = max(0.0, n[0] * half[0] + n[1] * half[1] + n[2] * half[2]) ** 30 * gloss
-            occl = _clamp(1.0 - max(0.0, cavity) * 0.18)
-            rim = (1 - n[2]) ** 3 * 0.35
+            spec = max(0.0, n[0] * half[0] + n[1] * half[1] + n[2] * half[2]) ** 24 * gloss
+            occl = _clamp(1.0 - max(0.0, cavity) * 0.35)
+            rim = (1 - n[2]) ** 3 * 0.12
+            # the key light is a spot on the centre of the face; edges and hair fall into shadow
+            spot_d = ((px - CX + 2.0) / 20.0) ** 2 + ((py - CY - 6.0) / 26.0) ** 2
+            spot = 1.0 - 0.8 * _ss(0.2, 1.05, spot_d)
             shade = []
             for i in range(3):
-                v = col[i] * (0.24 + 0.92 * diff * warm[i] + 0.16 * fil * cool[i]) * occl
-                v += spec * warm[i] + rim * st.tint[i] * 0.6
+                v = col[i] * (0.08 * occl + 1.45 * diff * spot * warm[i] * occl + 0.06 * fil * cool[i])
+                v += spec * warm[i] * spot + rim * st.tint[i]
                 if sss:  # light scattering under skin warms the shadows
-                    v += (1 - diff) * col[i] * (0.16, 0.05, 0.02)[i]
-                shade.append(v)
+                    v += (1 - diff) * spot * col[i] * (0.10, 0.03, 0.01)[i]
+                shade.append(lift[i] + v * (1 - lift[i]))
 
             # glasses are drawn over everything, unlit
             if reg == "face" and st.glasses:
                 shade = _glasses(shade, px, py, dx, rx_at(py))
 
-            # ---- screen tint, dither, quantise
-            lum = 0.3 * shade[0] + 0.59 * shade[1] + 0.11 * shade[2]
-            shade = [shade[i] * (1 - st.tint_amount) + lum * st.tint[i] * 1.1 * st.tint_amount
-                     for i in range(3)]
-            dither = (BAYER4[y % 4][x % 4] / 16 - 0.5) / st.levels
-            q = [int(round(_clamp(c + dither) * (st.levels - 1))) * 255 // (st.levels - 1) for c in shade]
-            o = (y * W + x) * 4
+            acc[y][x] = shade
+
+    # ---- average into blocks, add a little painterly variation, tint and posterise
+    jitter = random.Random(st.seed + 1)
+    out = bytearray(W * H * 4)
+    for by in range(H):
+        for bx in range(W):
+            j1, j2 = jitter.random(), jitter.random()
+            samples = [acc[by * SS + sy][bx * SS + sx] for sy in range(SS) for sx in range(SS)]
+            samples = [c for c in samples if c is not None]
+            if len(samples) * 2 <= SS * SS:
+                continue  # mostly background: leave transparent
+            k = len(samples)
+            rgb = [sum(c[i] for c in samples) / k for i in range(3)]
+            bright = 0.93 + 0.14 * j1                 # brush-stroke variation
+            warmth = (j2 - 0.5) * 0.05
+            rgb = [rgb[0] * bright + warmth, rgb[1] * bright, rgb[2] * bright - warmth]
+            lum = 0.3 * rgb[0] + 0.59 * rgb[1] + 0.11 * rgb[2]
+            rgb = [lum + (c - lum) * 1.3 for c in rgb]   # richer colour
+            rgb = [rgb[i] * (1 - st.tint_amount) + lum * st.tint[i] * 1.1 * st.tint_amount
+                   for i in range(3)]
+            q = [int(round(_clamp(c) * (st.levels - 1))) * 255 // (st.levels - 1) for c in rgb]
+            o = (by * W + bx) * 4
             out[o:o + 4] = bytes((q[0], q[1], q[2], 255))
     return bytes(out)
 
@@ -341,8 +368,8 @@ def _features(st, col, gloss, n, px, py, dx, n_, blink, mouth, opening, brow, lo
             continue
         if not (top < py < bot):
             continue
-        n = flat
-        sclera = (0.87, 0.83, 0.80)
+        # eyes keep the socket's shading, so they sit in shadow like a real portrait
+        sclera = (0.52, 0.46, 0.40)
         shade = 0.72 if py < top + 0.9 else 0.94          # lid shadow on the eyeball
         shade *= 0.85 if abs(edx) > hw - 1.0 else 1.0       # corners
         col, gloss = _scale(sclera, shade), 0.0
@@ -391,13 +418,13 @@ def _glasses(rgb, px, py, dx, rx):
         ex = CX + side * EYE_DX
         ux, uy = (px - ex) / 4.5, (py - (EYE_Y + 0.3)) / 3.0
         r = (ux ** 4 + uy ** 4) ** 0.25                      # rounded rectangle
-        if 0.86 < r < 1.08:
+        if 0.80 < r < 1.12:
             return [0.45, 0.45, 0.48] if (uy < -0.7 and ux * side < -0.2) else frame
-        if r <= 0.86 and -0.5 < ux - uy * 0.6 < -0.2:
+        if r <= 0.80 and -0.5 < ux - uy * 0.6 < -0.2:
             return [min(1.0, c * 0.85 + 0.18) for c in rgb]  # glint on the lens
-    if abs(py - (EYE_Y - 0.9)) < 0.5 and abs(dx) < EYE_DX - 4.0:
+    if abs(py - (EYE_Y - 0.9)) < 0.7 and abs(dx) < EYE_DX - 4.0:
         return frame                                         # bridge
-    if abs(py - (EYE_Y - 0.9)) < 0.45 and EYE_DX + 4.4 < abs(dx) < rx + 0.5:
+    if abs(py - (EYE_Y - 0.9)) < 0.6 and EYE_DX + 4.4 < abs(dx) < rx + 0.5:
         return frame                                         # arms
     return rgb
 

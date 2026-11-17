@@ -152,18 +152,18 @@ class PixelHead(Widget):
 
         self.canvas.clear()
         with self.canvas:
-            Color(0.01, 0.02, 0.02, 1)
+            Color(0.045, 0.034, 0.028, 1)                 # dark warm backdrop, like an oil portrait
             Rectangle(pos=self.pos, size=self.size)
-            for i, a in enumerate((0.04, 0.05, 0.06)):  # glow in the screen's colour
-                r = unit * (34 - i * 4)
-                Color(*tint, a)
+            for i, a in enumerate((0.035, 0.04, 0.05)):   # faint warm halo, nudged by the screen colour
+                r = unit * (24 - i * 3)
+                Color(*[0.8 * w + 0.2 * c for w, c in zip((0.9, 0.55, 0.3), tint)], a)
                 Ellipse(pos=(ox + scale * tw / 2 - r * 0.85, oy + scale * th / 2 - r),
                         size=(r * 1.7, r * 2))
             Color(1, 1, 1, 1)
             Rectangle(texture=texture, pos=(ox, oy), size=(scale * tw, scale * th))
 
             # CRT scanlines across the whole screen
-            Color(0, 0, 0, 0.22)
+            Color(0, 0, 0, 0.12)
             step = max(3.0, unit)
             y = self.y
             while y < self.top:

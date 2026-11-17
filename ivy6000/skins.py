@@ -80,7 +80,7 @@ _add(Skin(
     palette=sprites.PALETTES["phosphor"],
     face=portrait.FaceStyle(hair="full", skin=(0.93, 0.76, 0.64), eye_color=(0.32, 0.52, 0.42),
                             hair_color=(0.36, 0.24, 0.14),
-                            tint=(0.55, 0.95, 0.65), tint_amount=0.18),
+                            tint=(0.55, 0.95, 0.65), tint_amount=0.06),
     voice=VoiceStyle(rate=165, pitch=45, piper="en_GB-northern_english_male-medium",
                      piper_speed=1.05),
     greeting="Oh. You're awake. I'm DOT, the ship's computer. What can I do for you?",
@@ -235,7 +235,7 @@ def all_skins(user_root: Path | None = None) -> dict[str, Skin]:
     return skins
 
 
-def export_skin(skin: Skin, dest: Path, scale: int = 4) -> None:
+def export_skin(skin: Skin, dest: Path, scale: int = 6) -> None:
     """Write a skin as an editable folder: skin.json + PNG frames."""
     dest.mkdir(parents=True, exist_ok=True)
     frames = portrait.frames(skin.face)
