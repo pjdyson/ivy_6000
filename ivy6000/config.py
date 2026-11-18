@@ -42,6 +42,8 @@ class Settings:
     voice_engine: str = "auto"
     # Exact voice name to use instead of the skin's preference (e.g. "Daniel", "en-gb+m3").
     voice_name: str = ""
+    # Voice input: the MIC button listens through the microphone (needs vosk + sounddevice).
+    mic_enabled: bool = True
     history_limit: int = 20
 
     def resolved_api_key(self) -> str:

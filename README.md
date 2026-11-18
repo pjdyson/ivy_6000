@@ -20,10 +20,17 @@ pip install -e ".[claude]"
 ivy-6000                           # or: python main.py
 ```
 
+The `.` in `pip install -e .` is required — it means "the project in the current directory".
+Bare `pip install -e` fails with "-e option requires 1 argument".
+
+Chat log text is selectable: click-drag to highlight, then Ctrl+C to copy.
+
 On first launch it picks a brain automatically: Claude if `ANTHROPIC_API_KEY` is set, OpenAI
 if `OPENAI_API_KEY` is set, otherwise LM Studio or Ollama if one is running locally, otherwise
 **offline** mode (canned in-character replies). Press **SET** for settings and
-**VOX** to mute or unmute the voice.
+**VOX** to mute or unmute the voice. Press **MIC** to talk instead of typing — that needs
+the offline speech-to-text engine: `pip install -e ".[stt]"` (plus `libportaudio2` on
+Linux, `brew install portaudio` on macOS); the ~40 MB model downloads on first use.
 
 ## Characters (skins)
 

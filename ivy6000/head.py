@@ -31,7 +31,7 @@ def _texture_from_rgba(rgba: bytes, w: int, h: int) -> Texture:
 
 
 class PixelHead(Widget):
-    state = OptionProperty("idle", options=["idle", "thinking", "talking"])
+    state = OptionProperty("idle", options=["idle", "thinking", "talking", "listening"])
     skin = ObjectProperty(None)
 
     def __init__(self, **kwargs):
@@ -109,7 +109,7 @@ class PixelHead(Widget):
         blink = t < self.blink_until
 
         if t >= self.next_look:
-            if self.state == "thinking":
+            if self.state in ("thinking", "listening"):
                 self.look = rng.choice((-1, 1))
                 self.next_look = t + rng.uniform(0.6, 1.4)
             else:
@@ -130,7 +130,7 @@ class PixelHead(Widget):
         if t >= self.glitch_until:
             self.glitch_shift = 0
 
-        thinking = self.state == "thinking"
+        thinking = self.state in ("thinking", "listening")
         if self.skin.frames:
             name = "blink" if blink else "think" if thinking else (
                 {1: "talk1", 2: "talk2"}.get(self.mouth, "idle"))

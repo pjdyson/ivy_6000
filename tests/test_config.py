@@ -6,6 +6,7 @@ def test_round_trip(tmp_path):
     s = config.Settings().with_provider("ollama")
     s.skin = "hugo"
     s.voice_enabled = False
+    s.mic_enabled = False
     config.save(s, p)
     assert config.load(p) == s
 

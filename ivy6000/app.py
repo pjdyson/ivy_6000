@@ -42,7 +42,7 @@ from kivy.uix.switch import Switch
 from kivy.uix.textinput import TextInput
 from kivy.uix.togglebutton import ToggleButton
 
-from . import config, llm, persona, skins, tts
+from . import config, llm, persona, skins, stt, tts
 from .head import PixelHead
 
 FONT = "RobotoMono-Regular"
@@ -61,8 +61,14 @@ def _label(text="", **kw):
     return lbl
 
 
-def _escape(text: str) -> str:
-    return text.replace("&", "&amp;").replace("[", "&bl;").replace("]", "&br;")
+def _selectable(text="", **kw):
+    """A readonly TextInput: looks like a label but its text can be selected and copied."""
+    ti = TextInput(text=text, font_name=FONT, multiline=True, readonly=True,
+                   background_normal="", background_active="", background_color=(0, 0, 0, 0),
+                   cursor_color=(0, 0, 0, 0), halign="left", **kw)  # TextInput has no valign/texture_size
+    ti.bind(minimum_height=lambda l, h: setattr(l, "height", h))
+    ti.size_hint_y = None
+    return ti
 
 
 class Performer(threading.Thread):
@@ -125,6 +131,7 @@ class ChatScreen(BoxLayout):
         self.app = app
         self.history: list[llm.Message] = []
         self.busy = False
+        self.listener: stt.Listener | None = None
 
         top = BoxLayout(size_hint_y=None, height=dp(36), spacing=dp(4))
         self.title = Label(font_name=FONT, halign="left", valign="middle", font_size=sp(13))
@@ -132,6 +139,10 @@ class ChatScreen(BoxLayout):
         top.add_widget(self.title)
         self.status = Label(font_name=FONT, font_size=sp(11), size_hint_x=None, width=dp(84))
         top.add_widget(self.status)
+        self.mic = ToggleButton(text="MIC", font_name=FONT, size_hint_x=None, width=dp(56),
+                                background_normal="", disabled=not app.settings.mic_enabled)
+        self.mic.bind(state=self._mic_toggled)
+        top.add_widget(self.mic)
         self.vox = ToggleButton(text="VOX", font_name=FONT, size_hint_x=None, width=dp(56),
                                 background_normal="", state="down" if app.settings.voice_enabled else "normal")
         self.vox.bind(state=self._vox_toggled)
@@ -175,6 +186,7 @@ class ChatScreen(BoxLayout):
 
     def apply_skin(self, greet: bool):
         self.performer.cancel()  # don't finish the old character's sentence in the new voice
+        self.stop_listening()
         skin = self.app.skin
         pal = skin.palette
         fg, dim, dark = _rgba(pal["S"]), _rgba(pal["D"]), _rgba(pal["H"])
@@ -183,9 +195,10 @@ class ChatScreen(BoxLayout):
         self.title.color = dim
         self.status.color = dim
         self.subtitle.color = fg
-        for btn in (self.vox, self.gear, self.send_btn):
+        for btn in (self.mic, self.vox, self.gear, self.send_btn):
             btn.color = fg
             btn.background_color = (*[c * 0.35 for c in pal["D"]], 1)
+        self.mic.disabled = not self.app.settings.mic_enabled
         self.vox.background_down = ""
         self.entry.background_color = (*[c * 0.12 for c in pal["S"]], 1)
         self.entry.foreground_color = fg
@@ -257,14 +270,68 @@ class ChatScreen(BoxLayout):
             self.add_log("SYSTEM", tts.voice_help())
         self.app.save_settings(reskin=False)
 
+    # ------------------------------------------------------------------ voice input
+
+    def _mic_toggled(self, _btn, state):
+        if state == "down":
+            self._start_listening()
+        else:
+            self.stop_listening()
+
+    def _start_listening(self):
+        if not self.app.settings.mic_enabled:
+            self.mic.state = "normal"
+            return
+        if self.listener is None:
+            status = lambda msg: Clock.schedule_once(lambda *_: self.add_log("SYSTEM", msg))  # noqa: E731
+            self.listener = stt.make_listener(self.app.models_dir, status)
+        if not self.listener.available:
+            self.mic.state = "normal"
+            self.add_log("SYSTEM", stt.listen_help())
+            return
+        print(f"[ivy-6000] listening with: {self.listener.name}")
+        self.head.state = "listening"
+        self.subtitle.text = "Listening..."
+        threading.Thread(target=self._listen_worker, daemon=True).start()
+
+    def _listen_worker(self):
+        try:
+            text = self.listener.listen()
+        except Exception as e:  # no mic, broken model, ... shouldn't kill the app
+            Clock.schedule_once(lambda *_, err=e: self._listen_error(err))
+            return
+        Clock.schedule_once(lambda *_: self._on_transcript(text))
+
+    def _listen_error(self, error):
+        self._reset_mic()
+        self.add_log("SYSTEM", f"Microphone problem: {error} {stt.listen_help()}")
+
+    def _on_transcript(self, text: str):
+        self._reset_mic()
+        text = text.strip()
+        if text:
+            self.entry.text = text
+            self.send()
+
+    def stop_listening(self):
+        if self.listener is not None:
+            self.listener.stop()
+        self._reset_mic()
+
+    def _reset_mic(self):
+        if self.mic.state == "down":
+            self.mic.state = "normal"
+        if not self.busy:
+            self.head.state = "idle"
+            self.subtitle.text = ""
+
     # ------------------------------------------------------------------ chat flow
 
     def add_log(self, who: str, text: str):
         pal = self.app.skin.palette
-        color = "".join(f"{int(c * 255):02x}" for c in (pal["S"] if who != "YOU" else (0.8, 0.84, 0.82)))
-        lbl = _label(f"[color={color}][b]{_escape(who)}>[/b] {_escape(text)}[/color]",
-                     markup=True, font_size=sp(13))
-        self.log.add_widget(lbl)
+        rgb = pal["S"] if who != "YOU" else (0.8, 0.84, 0.82)
+        entry = _selectable(f"{who}> {text}", font_size=sp(13), foreground_color=(*rgb, 1))
+        self.log.add_widget(entry)
         Clock.schedule_once(lambda *_: setattr(self.scroll, "scroll_y", 0), 0.05)
 
     def send(self):
@@ -273,6 +340,7 @@ class ChatScreen(BoxLayout):
             return
         self.entry.text = ""
         self.performer.cancel()
+        self.stop_listening()
         self.add_log("YOU", text)
         self.history.append({"role": "user", "content": text})
         self.busy = True
@@ -362,6 +430,8 @@ class SettingsPopup(Popup):
         self.voice_name = row("Voice override (blank = character's own; e.g. Daniel, or "
                               "en_GB-semaine-medium:poppy)",
                               TextInput(text=s.voice_name, multiline=False))
+        self.voice_input = row("Voice input (MIC button; needs vosk + sounddevice)",
+                               Switch(active=s.mic_enabled))
 
         buttons = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(6))
         cancel = Button(text="Cancel")
@@ -426,6 +496,7 @@ class SettingsPopup(Popup):
         s.voice_enabled = self.voice.active
         s.voice_name = self.voice_name.text.strip()
         s.voice_engine = self.engine_keys[self.engine.values.index(self.engine.text)]
+        s.mic_enabled = self.voice_input.active
         self.app.save_settings(reskin=True, greet=s.skin != old_skin)
         self.dismiss()
 
@@ -448,6 +519,10 @@ class Ivy6000App(App):
     @property
     def voices_dir(self) -> Path:
         return self.settings_path.parent / "voices"
+
+    @property
+    def models_dir(self) -> Path:
+        return self.settings_path.parent / "models"
 
     @property
     def user_skins_dir(self) -> Path:
@@ -477,6 +552,7 @@ class Ivy6000App(App):
 
     def on_stop(self):
         self.screen.performer.cancel()
+        self.screen.stop_listening()
 
 
 def run():
